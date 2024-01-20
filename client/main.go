@@ -14,10 +14,10 @@ type Currency struct {
 }
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8082/", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8080/", nil)
 	if err != nil {
 		panic(err)
 	}

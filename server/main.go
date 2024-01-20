@@ -18,7 +18,7 @@ type Currency struct {
 
 func main() {
 	http.HandleFunc("/", HomeHandle)
-	http.ListenAndServe(":8082", nil)
+	http.ListenAndServe(":8080", nil)
 }
 
 func HomeHandle(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +33,7 @@ func HomeHandle(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20000*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
