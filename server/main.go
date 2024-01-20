@@ -66,5 +66,4 @@ func HomeHandle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(data)
-	fmt.Println("Server iniciado na porta 8082")
 }
