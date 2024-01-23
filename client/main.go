@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -28,6 +29,12 @@ func main() {
 	}
 	defer res.Body.Close()
 
+	out, err := os.Create("cotacao.txt")
+	if err != nil {
+		panic(err)
+	}
+	defer out.Close()
+
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		panic(err)
@@ -40,5 +47,11 @@ func main() {
 	}
 	bidString := data["USDBRL"].Bid
 
+	err = os.WriteFile("cotacao.txt", []byte(fmt.Sprintf("Valor:%s", bidString)), 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	defer out.Close()
 	fmt.Println("A cotação atual do dólar é R$:", bidString)
 }
