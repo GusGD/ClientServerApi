@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -38,6 +38,9 @@ func HomeHandle(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Println("Error: Execution time exceeded")
+		}
 		panic(err)
 	}
 
@@ -52,18 +55,21 @@ func HomeHandle(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Debug:", string(body))
 	var data map[string]Currency
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		panic(err)
 	}
 	bidString := data["USDBRL"].Bid
-	fmt.Println("bidString")
-	_, err = db.Exec("INSERT INTO currencies (bid) VALUES (?)", bidString)
+
+	ctxInsert, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	_, err = db.ExecContext(ctxInsert, "INSERT INTO currencies (bid) VALUES (?)", bidString)
 	if err != nil {
+		if ctxInsert.Err() == context.DeadlineExceeded {
+			log.Println("Error: Execution time exceeded")
+		}
 		panic(err)
 	}
-
 	json.NewEncoder(w).Encode(data)
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -15,11 +16,14 @@ type Currency struct {
 }
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8080/", nil)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Println("Error: Execution time exceeded")
+		}
 		panic(err)
 	}
 	client := &http.Client{}
