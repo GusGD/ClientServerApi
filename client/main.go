@@ -11,51 +11,64 @@ import (
 	"time"
 )
 
+const (
+	APIURLLOCAL = "http://localhost:8080/"
+	TimeoutReq  = 30000 * time.Millisecond
+)
+
+var client = &http.Client{}
+
 type Currency struct {
 	Bid string `json:"bid"`
 }
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	err := getCurrency()
+	if err != nil {
+		log.Fatalf("ERROR: %v", err)
+	}
+}
+
+func getCurrency() error {
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutReq)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8080/", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", APIURLLOCAL, nil)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			log.Println("Error: Execution time exceeded")
 		}
-		panic(err)
+		return err
 	}
-	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer res.Body.Close()
 
-	out, err := os.Create("cotacao.txt")
-	if err != nil {
-		panic(err)
-	}
-	defer out.Close()
-
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		panic(err)
+		return err
 	}
-
 	var data map[string]Currency
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	bidString := data["USDBRL"].Bid
 
-	err = os.WriteFile("cotacao.txt", []byte(fmt.Sprintf("Valor:%s", bidString)), 0644)
+	err = writeToFile("cotacao.txt", bidString)
 	if err != nil {
-		panic(err)
+		return err
 	}
-
-	defer out.Close()
 	fmt.Println("A cotação atual do dólar é R$:", bidString)
+	return nil
+}
+
+func writeToFile(fileName, content string) error {
+	err := os.WriteFile("cotacao.txt", []byte(fmt.Sprintf("Valor:%s", content)), 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }

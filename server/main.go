@@ -12,31 +12,62 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const (
+	DBPath        = "../currencies.db"
+	APIURL        = "https://economia.awesomeapi.com.br/json/last/USD-BRL"
+	TimeoutAPI    = 20000 * time.Millisecond
+	TimeoutInsert = 100 * time.Millisecond
+)
+
+var client = &http.Client{}
+
 type Currency struct {
 	Bid string `json:"bid"`
 }
 
 func main() {
 	http.HandleFunc("/", HomeHandle)
-	http.ListenAndServe(":8080", nil)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func HomeHandle(w http.ResponseWriter, r *http.Request) {
-	db, err := sql.Open("sqlite3", "../currencies.db")
+	db, err := sql.Open("sqlite3", DBPath)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	defer db.Close()
 
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS currencies(id INTEGER PRIMARY KEY, bid TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
+	err = createTable(db)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	data, err := fetchData()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = insertData(db, data["USDBRL"].Bid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(data)
+}
+
+func createTable(db *sql.DB) error {
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS currencies(id INTEGER PRIMARY KEY, bid TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
+	return err
+}
+
+func fetchData() (map[string]Currency, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutAPI)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", APIURL, nil)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			log.Println("Error: Execution time exceeded")
@@ -44,10 +75,9 @@ func HomeHandle(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	client := http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	defer res.Body.Close()
 
@@ -60,16 +90,18 @@ func HomeHandle(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	bidString := data["USDBRL"].Bid
+	return data, nil
+}
 
-	ctxInsert, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+func insertData(db *sql.DB, bid string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), TimeoutInsert)
 	defer cancel()
-	_, err = db.ExecContext(ctxInsert, "INSERT INTO currencies (bid) VALUES (?)", bidString)
+
+	_, err := db.ExecContext(ctx, "INSERT INTO currencies (bid) VALUES (?)", bid)
 	if err != nil {
-		if ctxInsert.Err() == context.DeadlineExceeded {
+		if ctx.Err() == context.DeadlineExceeded {
 			log.Println("Error: Execution time exceeded")
 		}
-		panic(err)
 	}
-	json.NewEncoder(w).Encode(data)
+	return err
 }
